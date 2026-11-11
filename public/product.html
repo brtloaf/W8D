@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>weighted incorporated</title>
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body data-page="product">
+  <main id="main"><div id="product"></div></main>
+
+  <script type="module">
+    import { STORE, PRODUCTS, SHIPPING } from "./catalog.js";
+    import { fmt, imgTag, addToCart, toast, esc } from "./site.js";
+
+    const id = new URLSearchParams(location.search).get("id");
+    const p = PRODUCTS.find(x => x.id === id) || PRODUCTS[0];
+    document.title = p.name + " – " + STORE.name;
+    const root = document.getElementById("product");
+    const opts = Object.entries(p.options || {});
+
+    const optionHtml = opts.map(([key, values]) => `
+      <fieldset class="field"><legend>${esc(key)}</legend><div class="sizes">
+        ${values.map(v => `<label><input type="radio" name="opt-${esc(key)}" value="${esc(v)}"><span>${esc(v)}</span></label>`).join("")}
+      </div></fieldset>`).join("");
+
+    const shipNote = SHIPPING.freeOver != null
+      ? `Free shipping on orders over ${fmt(SHIPPING.freeOver)}.`
+      : (p.shipping ? `Shipping ${fmt(p.shipping)} each via ${esc(SHIPPING.service)}.` : "");
+
+    root.innerHTML = `
+      <div class="product">
+        <div class="gallery">
+          <div class="main" id="mainImg">${imgTag(p.images[0])}</div>
+          ${p.images.length > 1 ? `<div class="thumbs">${p.images.map((im, i) =>
+            `<button type="button" data-i="${i}" aria-label="Show photo ${i + 1}" aria-current="${i === 0}">${imgTag(im)}</button>`).join("")}</div>` : ""}
+        </div>
+        <div class="info">
+          <div class="brand">${esc(STORE.name)}</div>
+          <h1>${esc(p.name)}</h1>
+          <div class="price">${fmt(p.price)}</div>
+          ${p.soldOut ? '<div class="soldout">Sold out</div>' : `
+            ${optionHtml}
+            <div class="field"><label for="qty">Quantity</label>
+              <div class="qty"><button type="button" id="minus" aria-label="Decrease">−</button><input id="qty" value="1" inputmode="numeric"><button type="button" id="plus" aria-label="Increase">+</button></div>
+            </div>
+            <p class="err" id="err" role="alert"></p>
+            <button class="btn wide" id="add" type="button">Add to cart</button>
+            <p class="small">${shipNote} Taxes calculated at checkout.</p>`}
+          <p class="desc">${esc(p.description)}</p>
+          <a class="back" href="index.html#shop">← Back to all products</a>
+        </div>
+      </div>`;
+
+    // Gallery
+    root.querySelectorAll(".thumbs button").forEach(b => b.onclick = () => {
+      document.getElementById("mainImg").innerHTML = imgTag(p.images[+b.dataset.i]);
+      root.querySelectorAll(".thumbs button").forEach(x => x.setAttribute("aria-current", x === b));
+    });
+
+    if (!p.soldOut) {
+      const q = document.getElementById("qty");
+      const getQty = () => Math.min(20, Math.max(1, parseInt(q.value, 10) || 1));
+      document.getElementById("minus").onclick = () => q.value = Math.max(1, getQty() - 1);
+      document.getElementById("plus").onclick = () => q.value = Math.min(20, getQty() + 1);
+      q.onchange = () => q.value = getQty();
+
+      document.getElementById("add").onclick = () => {
+        const err = document.getElementById("err");
+        const chosen = {};
+        for (const [key] of opts) {
+          const el = document.querySelector(`input[name="opt-${CSS.escape(key)}"]:checked`);
+          if (!el) { err.textContent = `Please choose a ${key.toLowerCase()}.`; return; }
+          chosen[key] = el.value;
+        }
+        err.textContent = "";
+        addToCart(p.id, chosen, getQty());
+        toast(`Added to cart. <a href="cart.html">View cart &amp; check out →</a>`);
+      };
+    }
+  </script>
+</body>
+</html>

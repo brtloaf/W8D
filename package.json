@@ -1,0 +1,9 @@
+{
+  "name": "weighted-incorporated",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler pages dev public",
+    "test": "node test/pricing.test.js"
+  }
+}

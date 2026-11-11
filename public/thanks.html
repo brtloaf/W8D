@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Thank you – weighted incorporated</title>
+  <meta name="robots" content="noindex">
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body data-page="thanks">
+  <main id="main" class="page">
+    <h1>Thank you for your order.</h1>
+    <p>Your payment went through. PayPal will email you a receipt, and we'll email you when your order ships.</p>
+    <p id="orderId"></p>
+    <a class="btn ghost" href="index.html">Continue shopping</a>
+  </main>
+  <script type="module">
+    import { clearCart } from "./site.js";
+    clearCart();
+    const o = new URLSearchParams(location.search).get("order");
+    if (o) document.getElementById("orderId").textContent = "Order reference: " + o;
+  </script>
+</body>
+</html>

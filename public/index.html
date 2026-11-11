@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>W8D – weighted incorporated</title>
+  <meta name="description" content="A weighted blanket you can wear.">
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body data-page="home">
+  <main id="main">
+    <section class="hero">
+      <h1>A weighted blanket you can wear.</h1>
+      <p>Heavyweight comfort, built into the clothes you already live in.</p>
+      <a class="btn" href="#shop">Shop now</a>
+    </section>
+
+    <h2 class="section-title" id="shop">Products</h2>
+    <div class="grid" id="grid"></div>
+
+    <!-- Edit these three blurbs to match your product -->
+    <section class="features">
+      <div><h4>Evenly weighted</h4><p>Weight is spread across the body, not bunched in one spot.</p></div>
+      <div><h4>Everyday wear</h4><p>Looks and feels like a sweatshirt, because it is one.</p></div>
+      <div><h4>Secure checkout</h4><p>Pay with PayPal, Venmo or any major card.</p></div>
+    </section>
+  </main>
+
+  <script type="module">
+    import { PRODUCTS } from "./catalog.js";
+    import { fmt, imgTag, esc } from "./site.js";
+    document.getElementById("grid").innerHTML = PRODUCTS.map(p => `
+      <a class="card" href="product.html?id=${p.id}">
+        <div class="img">${imgTag(p.images[0])}${p.soldOut ? '<span class="badge">Sold out</span>' : ""}</div>
+        <h3>${esc(p.name)}</h3>
+        <div class="price">${fmt(p.price)}</div>
+      </a>`).join("");
+  </script>
+</body>
+</html>

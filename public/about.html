@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>About – weighted incorporated</title>
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body data-page="about">
+  <main id="main" class="page">
+    <h1>About</h1>
+    <!-- Replace this text with your own story -->
+    <p>weighted incorporated makes clothing with weight built in: the calm, grounded feeling of a weighted blanket, in something you can wear all day.</p>
+    <p>Questions about sizing or an order? Email us anytime.</p>
+    <a class="btn ghost" id="mail" href="#">Email us</a>
+  </main>
+  <script type="module">
+    import { STORE } from "./catalog.js";
+    import "./site.js";
+    document.getElementById("mail").href = "mailto:" + STORE.contactEmail;
+  </script>
+</body>
+</html>

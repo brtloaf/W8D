@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Cart – weighted incorporated</title>
+  <meta name="robots" content="noindex">
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body data-page="cart">
+  <main id="main">
+    <h1 class="page-title">Your cart</h1>
+    <div id="cart"></div>
+  </main>
+
+  <script type="module">
+    import { STORE, SHIPPING } from "./catalog.js";
+    import { fmt, imgTag, getCart, saveCart, clearCart, productById, esc } from "./site.js";
+
+    const root = document.getElementById("cart");
+
+    function shippingEstimate(cart, sub) {
+      if (SHIPPING.freeOver != null && sub >= SHIPPING.freeOver) return 0;
+      return cart.reduce((s, l) => s + (productById(l.id).shipping || 0) * l.qty, 0);
+    }
+
+    function render() {
+      const cart = getCart();
+      if (!cart.length) {
+        root.innerHTML = `<div class="empty"><p>Your cart is empty.</p><a class="btn" href="index.html#shop">Continue shopping</a></div>`;
+        return;
+      }
+      let sub = 0, count = 0;
+      const rows = cart.map((l, i) => {
+        const p = productById(l.id);
+        sub += p.price * l.qty; count += l.qty;
+        const optText = Object.entries(l.options || {}).map(([k, v]) => `${esc(k)}: ${esc(v)}`).join(" · ");
+        return `
+          <div class="line">
+            <a class="thumb" href="product.html?id=${p.id}">${imgTag(p.images[0])}</a>
+            <div class="meta">
+              <a href="product.html?id=${p.id}">${esc(p.name)}</a>
+              ${optText ? `<div class="small">${optText}</div>` : ""}
+              <div class="small">${fmt(p.price)}</div>
+              ${p.soldOut ? `<div class="err">Sold out. Please remove this item.</div>` : ""}
+            </div>
+            <div class="qty"><button type="button" data-dec="${i}" aria-label="Decrease">−</button><input value="${l.qty}" data-q="${i}" inputmode="numeric" aria-label="Quantity"><button type="button" data-inc="${i}" aria-label="Increase">+</button></div>
+            <div class="lineTotal">${fmt(p.price * l.qty)}</div>
+            <button class="remove" type="button" data-rm="${i}" aria-label="Remove ${esc(p.name)}">Remove</button>
+          </div>`;
+      }).join("");
+      const ship = shippingEstimate(cart, sub);
+      const hasSoldOut = cart.some(l => productById(l.id).soldOut);
+      root.innerHTML = `
+        <div class="cartGrid">
+          <div>${rows}</div>
+          <aside class="summary">
+            <div class="row"><span>Subtotal</span><span>${fmt(sub)}</span></div>
+            <div class="row"><span>Shipping</span><span>${ship === 0 ? "Free" : fmt(ship)}</span></div>
+            <div class="row"><span>Tax</span><span class="small">Calculated in PayPal</span></div>
+            <div class="row total"><span>Estimated total</span><span>${fmt(sub + ship)}</span></div>
+            <p class="small">${esc(SHIPPING.service)} · ships to ${SHIPPING.countries.join(", ")}. Your final total, including any sales tax, appears in PayPal before you pay.</p>
+            <p class="err" id="err" role="alert"></p>
+            <div id="paypal">${hasSoldOut ? "" : '<div class="notice">Loading checkout…</div>'}</div>
+          </aside>
+        </div>`;
+      if (!hasSoldOut) mountPayPal();
+    }
+
+    root.addEventListener("click", (e) => {
+      const cart = getCart();
+      const t = e.target.dataset;
+      if (t.rm != null) cart.splice(+t.rm, 1);
+      else if (t.inc != null) cart[+t.inc].qty = Math.min(20, cart[+t.inc].qty + 1);
+      else if (t.dec != null) cart[+t.dec].qty = Math.max(1, cart[+t.dec].qty - 1);
+      else return;
+      saveCart(cart); render();
+    });
+    root.addEventListener("change", (e) => {
+      if (e.target.dataset.q == null) return;
+      const cart = getCart();
+      cart[+e.target.dataset.q].qty = Math.min(20, Math.max(1, parseInt(e.target.value, 10) || 1));
+      saveCart(cart); render();
+    });
+
+    // ---------- PayPal ----------
+    let sdk; // load the SDK once
+    async function loadSdk() {
+      if (sdk) return sdk;
+      sdk = (async () => {
+        const r = await fetch("/api/config");
+        if (!r.ok) throw new Error("no-api");
+        const { clientId } = await r.json();
+        if (!clientId) throw new Error("no-key");
+        await new Promise((ok, fail) => {
+          const s = document.createElement("script");
+          s.src = `https://www.paypal.com/sdk/js?client-id=${encodeURIComponent(clientId)}&currency=${STORE.currency}&enable-funding=venmo&components=buttons`;
+          s.onload = ok; s.onerror = () => fail(new Error("sdk"));
+          document.head.appendChild(s);
+        });
+      })();
+      return sdk;
+    }
+
+    const post = (url, body) => fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body || {}) });
+    const showErr = (m) => { const el = document.getElementById("err"); if (el) el.textContent = m; };
+
+    async function mountPayPal() {
+      const box = document.getElementById("paypal");
+      try { await loadSdk(); }
+      catch (e) {
+        box.innerHTML = `<div class="notice">${e.message === "no-key"
+          ? "Checkout isn't set up yet: add your PayPal keys in Cloudflare (see README)."
+          : "Checkout is unavailable right now. Please refresh, or email us to order."}</div>`;
+        return;
+      }
+      box.innerHTML = "";
+      paypal.Buttons({
+        style: { layout: "vertical", color: "black", shape: "rect", label: "checkout" },
+        createOrder: async () => {
+          showErr("");
+          const r = await post("/api/orders", { items: getCart() });
+          const d = await r.json();
+          if (!r.ok) { showErr(d.error || "Couldn't start checkout."); throw new Error(d.error); }
+          return d.id;
+        },
+        onShippingAddressChange: async (data, actions) => {
+          const r = await post(`/api/orders/${data.orderID}/shipping`, { address: data.shippingAddress });
+          if (!r.ok) {
+            const d = await r.json().catch(() => ({}));
+            return actions.reject(d.code === "COUNTRY" ? data.errors?.COUNTRY_ERROR : data.errors?.ADDRESS_ERROR);
+          }
+        },
+        onApprove: async (data, actions) => {
+          const r = await post(`/api/orders/${data.orderID}/capture`);
+          const d = await r.json().catch(() => ({}));
+          if (d.restart) return actions.restart(); // card declined: let buyer pick another method
+          if (!r.ok || d.status !== "COMPLETED") { showErr(d.error || "Payment didn't go through. You haven't been charged."); return; }
+          clearCart();
+          location.href = "thanks.html?order=" + encodeURIComponent(d.id);
+        },
+        onError: () => showErr("Something went wrong with checkout. Please try again or email us."),
+      }).render("#paypal");
+    }
+
+    render();
+  </script>
+</body>
+</html>
